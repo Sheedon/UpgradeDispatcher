@@ -35,10 +35,17 @@ public class UpgradeInstaller {
     }
 
     public static void noticeWakeOpened(Context context) {
-        Upgrade.with(context).noticeWakeOpened();
+        if (Upgrade.isUpgradeInstalled())
+            Upgrade.with(context).noticeWakeOpened();
+    }
+
+    public static void cancel(Context context) {
+        if (Upgrade.isUpgradeInstalled())
+            Upgrade.with(context).cancel();
     }
 
     public static void noticeWakeReceived(Context context) {
-        Upgrade.with(context).noticeWakeReceived();
+        if (Upgrade.isUpgradeInstalled())
+            Upgrade.with(context).noticeWakeReceived();
     }
 }

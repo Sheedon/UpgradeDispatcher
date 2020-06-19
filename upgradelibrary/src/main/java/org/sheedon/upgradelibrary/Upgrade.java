@@ -52,6 +52,7 @@ public class Upgrade {
     final InstallListener listener;
 
     private Observer<Integer> currentObserver;
+    private Disposable disposable;
     private String msg;
 
     private UpgradeListener upgradeListener;
@@ -75,6 +76,7 @@ public class Upgrade {
                     currentObserver = new Observer<Integer>() {
                         @Override
                         public void onSubscribe(@NonNull Disposable d) {
+                            disposable = d;
                         }
 
                         @Override
@@ -83,10 +85,10 @@ public class Upgrade {
                             Log.v("SXD", "" + integer);
 
 
-                            if (upgradeListener != null){
-                                if(integer>=0 && integer<=100){
+                            if (upgradeListener != null) {
+                                if (integer >= 0 && integer <= 100) {
                                     upgradeListener.onProgress(integer);
-                                }else{
+                                } else {
                                     upgradeListener.onUpgradeStatus(integer);
                                 }
                             }
@@ -233,6 +235,17 @@ public class Upgrade {
         }
         if (installManager != null) {
             installManager.noticeWakeReceived();
+        }
+    }
+
+    public void cancel() {
+
+        if(upgradeListener != null){
+            upgradeListener.onUpgradeStatus(ShareConstants.STATUS_UPGRADE_CANCEL);
+        }
+
+        if (disposable != null && !disposable.isDisposed()) {
+            disposable.dispose();
         }
     }
 

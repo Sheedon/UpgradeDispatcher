@@ -64,7 +64,7 @@ public class DefaultWakeManager implements WakeManagerCenter {
                 if (ApkUtils.isAppInstalled(ShareConstants.WAKE_APP_PACKAGE, context)) {
                     startReceiverApp(context);
                     setUpping = false;
-                    emitter.onNext(ShareConstants.STATUS_INIT_WAKE_INSTALLED);
+                    sendNext(emitter, ShareConstants.STATUS_INIT_WAKE_INSTALLED);
                 }
             }
         });
@@ -88,7 +88,7 @@ public class DefaultWakeManager implements WakeManagerCenter {
                 }
 
                 if (wakeFolder == null) {
-                    emitter.onError(new UpgradeStatusException(ShareConstants.STATUS_INIT_FILE_CREATION_FAILED));
+                    sendError(emitter, ShareConstants.STATUS_INIT_FILE_CREATION_FAILED);
                     return;
                 }
 
@@ -118,7 +118,7 @@ public class DefaultWakeManager implements WakeManagerCenter {
 
                 if (file == null) {
                     // 通知导出失败
-                    emitter.onError(new UpgradeStatusException(ShareConstants.STATUS_INIT_FILE_EXPORT_FAILED));
+                    sendError(emitter, ShareConstants.STATUS_INIT_FILE_EXPORT_FAILED);
                     setUpping = false;
                     return;
                 }
@@ -127,14 +127,14 @@ public class DefaultWakeManager implements WakeManagerCenter {
                 int code = ApkUtils.installApk(context, file);
                 if (code == 1) {
                     // 成功
-                    emitter.onNext(ShareConstants.STATUS_INIT_WAKE_INSTALLED);
+                    sendNext(emitter, ShareConstants.STATUS_INIT_WAKE_INSTALLED);
                 } else if (code == -1) {
                     // 没有权限
-                    emitter.onError(new UpgradeStatusException(ShareConstants.STATUS_INIT_FILE_PERMISSION_DENIED));
+                    sendError(emitter, ShareConstants.STATUS_INIT_FILE_PERMISSION_DENIED);
                     setUpping = true;
                 } else {
                     // 失败
-                    emitter.onError(new UpgradeStatusException(ShareConstants.STATUS_INIT_INSTALLATION_FAILED));
+                    sendError(emitter, ShareConstants.STATUS_INIT_INSTALLATION_FAILED);
                     setUpping = true;
                 }
             }
@@ -161,12 +161,12 @@ public class DefaultWakeManager implements WakeManagerCenter {
                         lock.wait(15 * 1000);
                         long endTime = System.currentTimeMillis();
                         if (endTime - startTime >= 15 * 1000) {
-                            emitter.onError(new UpgradeStatusException(ShareConstants.STATUS_INIT_NOTIFICATION_TIMEOUT));
+                            sendError(emitter, ShareConstants.STATUS_INIT_NOTIFICATION_TIMEOUT);
                         } else {
-                            emitter.onNext(ShareConstants.STATUS_INIT_WAKE_COMPLETE);
+                            sendNext(emitter, ShareConstants.STATUS_INIT_WAKE_COMPLETE);
                         }
                     } catch (InterruptedException ignored) {
-                        emitter.onNext(ShareConstants.STATUS_INIT_WAKE_COMPLETE);
+                        sendNext(emitter, ShareConstants.STATUS_INIT_WAKE_COMPLETE);
                     } finally {
                         setUpping = false;
                     }
@@ -215,7 +215,7 @@ public class DefaultWakeManager implements WakeManagerCenter {
                             lock.wait(15 * 1000);
                             long endTime = System.currentTimeMillis();
                             if (endTime - startTime >= 15 * 1000) {
-                                emitter.onError(new UpgradeStatusException(ShareConstants.STATUS_UPGRADE_NOTIFICATION_TIMEOUT));
+                                sendError(emitter, ShareConstants.STATUS_UPGRADE_NOTIFICATION_TIMEOUT);
                             } else {
                                 ApkUtils.sendBroadcast(context, ApkUtils.getPackageName(context));
                             }
@@ -224,7 +224,7 @@ public class DefaultWakeManager implements WakeManagerCenter {
                         }
                     }
 
-                }else{
+                } else {
                     ApkUtils.sendBroadcast(context, ApkUtils.getPackageName(context));
                 }
             }
@@ -247,16 +247,13 @@ public class DefaultWakeManager implements WakeManagerCenter {
                         lock.wait(15 * 1000);
                         long endTime = System.currentTimeMillis();
 
-                        if(emitter.isDisposed())
-                            return;
-
                         if (endTime - startTime >= 15 * 1000) {
-                            emitter.onError(new UpgradeStatusException(ShareConstants.STATUS_UPGRADE_NOTIFICATION_TIMEOUT));
+                            sendError(emitter, ShareConstants.STATUS_UPGRADE_NOTIFICATION_TIMEOUT);
                         } else {
-                            emitter.onNext(ShareConstants.STATUS_UPGRADE_RECEIVED);
+                            sendNext(emitter, ShareConstants.STATUS_UPGRADE_RECEIVED);
                         }
                     } catch (InterruptedException ignored) {
-                        emitter.onNext(ShareConstants.STATUS_UPGRADE_RECEIVED);
+                        sendNext(emitter, ShareConstants.STATUS_UPGRADE_RECEIVED);
                     }
                 }
 
@@ -282,5 +279,15 @@ public class DefaultWakeManager implements WakeManagerCenter {
     // 启动广播监听App
     private void startReceiverApp(Context context) {
         ApkUtils.startAPP(context, ShareConstants.WAKE_APP_PACKAGE);
+    }
+
+    private void sendNext(ObservableEmitter<Integer> emitter, int status) {
+        if (!emitter.isDisposed())
+            emitter.onNext(status);
+    }
+
+    private void sendError(ObservableEmitter<Integer> emitter, int status) {
+        if (!emitter.isDisposed())
+            emitter.onError(new UpgradeStatusException(status));
     }
 }

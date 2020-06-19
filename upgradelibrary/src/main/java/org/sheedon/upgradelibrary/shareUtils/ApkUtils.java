@@ -124,9 +124,13 @@ public class ApkUtils {
             if (apkPackageInfo == null)
                 return false;
 
-            Uri apkUri = FileProvider.getUriForFile(context, apkPackageInfo.packageName + ".fileprovider", downloadFile);
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
+            try {
+                Uri apkUri = FileProvider.getUriForFile(context, apkPackageInfo.packageName + ".fileprovider", downloadFile);
+                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
+            } catch (IllegalArgumentException ignored) {
+                return false;
+            }
         } else {
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             Uri uri = Uri.fromFile(downloadFile);

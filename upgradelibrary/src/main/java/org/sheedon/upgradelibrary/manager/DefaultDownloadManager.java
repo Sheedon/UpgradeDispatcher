@@ -84,7 +84,7 @@ public class DefaultDownloadManager implements DownloadManagerCenter, DownloadLi
                 }
 
                 if (downloadFolder == null) {
-                    emitter.onError(new UpgradeStatusException(ShareConstants.STATUS_INIT_FILE_CREATION_FAILED));
+                    sendError(emitter, ShareConstants.STATUS_INIT_FILE_CREATION_FAILED);
                     return;
                 }
 
@@ -93,14 +93,14 @@ public class DefaultDownloadManager implements DownloadManagerCenter, DownloadLi
 
                 if (files == null) {
                     setUpping = false;
-                    emitter.onNext(ShareConstants.STATUS_INIT_DOWNLOAD_COMPLETE);
+                    sendNext(emitter, ShareConstants.STATUS_INIT_DOWNLOAD_COMPLETE);
                     return;
                 }
 
                 for (File file : files) {
                     clearFile(context, file);
                 }
-                emitter.onNext(ShareConstants.STATUS_INIT_DOWNLOAD_COMPLETE);
+                sendNext(emitter, ShareConstants.STATUS_INIT_DOWNLOAD_COMPLETE);
                 setUpping = false;
             }
         });
@@ -140,19 +140,19 @@ public class DefaultDownloadManager implements DownloadManagerCenter, DownloadLi
                 running = true;
 
                 if (model == null || model.getNetVersionModel() == null) {
-                    emitter.onError(new UpgradeStatusException(ShareConstants.STATUS_UPGRADE_PARAMETER_ERROR));
+                    sendError(emitter,ShareConstants.STATUS_UPGRADE_PARAMETER_ERROR);
                     return;
                 }
 
                 upgradeVersion = model.getNetVersionModel().getVersion();
                 if (upgradeVersion <= currentVersion) {
-                    emitter.onError(new UpgradeStatusException(ShareConstants.STATUS_UPGRADE_GREATER_THAN_CURRENT_VERSION));
+                    sendError(emitter,ShareConstants.STATUS_UPGRADE_GREATER_THAN_CURRENT_VERSION);
                     return;
                 }
 
                 String path = model.getNetVersionModel().getPath();
                 if (path == null || path.isEmpty()) {
-                    emitter.onError(new UpgradeStatusException(ShareConstants.STATUS_UPGRADE_PARAMETER_ERROR));
+                    sendError(emitter,ShareConstants.STATUS_UPGRADE_PARAMETER_ERROR);
                     return;
                 }
 
@@ -179,7 +179,7 @@ public class DefaultDownloadManager implements DownloadManagerCenter, DownloadLi
 
                         lock.wait();
                     } catch (InterruptedException ignored) {
-                        emitter.onError(new UpgradeStatusException(ShareConstants.STATUS_UPGRADE_DOWNLOAD_FAIL));
+                        sendError(emitter,ShareConstants.STATUS_UPGRADE_DOWNLOAD_FAIL);
                     } finally {
                         running = false;
                         downloadEmitter = null;
@@ -230,4 +230,16 @@ public class DefaultDownloadManager implements DownloadManagerCenter, DownloadLi
             lock.notifyAll();
         }
     }
+
+
+    private void sendNext(ObservableEmitter<Integer> emitter, int status) {
+        if (!emitter.isDisposed())
+            emitter.onNext(status);
+    }
+
+    private void sendError(ObservableEmitter<Integer> emitter, int status) {
+        if (!emitter.isDisposed())
+            emitter.onError(new UpgradeStatusException(status));
+    }
+
 }

@@ -66,17 +66,18 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
+    public void onCancelClick(View view){
+        UpgradeInstaller.cancel(this);
+    }
+
     private boolean checkUsagePermission() {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
-            AppOpsManager appOps = (AppOpsManager) getSystemService(Context.APP_OPS_SERVICE);
-            int mode = 0;
-            mode = appOps.checkOpNoThrow("android:get_usage_stats", android.os.Process.myUid(), getPackageName());
-            boolean granted = mode == AppOpsManager.MODE_ALLOWED;
-            if (!granted) {
-                Intent intent = new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS);
-                startActivityForResult(intent, 1);
-                return false;
-            }
+        AppOpsManager appOps = (AppOpsManager) getSystemService(Context.APP_OPS_SERVICE);
+        int mode = appOps.checkOpNoThrow("android:get_usage_stats", android.os.Process.myUid(), getPackageName());
+        boolean granted = mode == AppOpsManager.MODE_ALLOWED;
+        if (!granted) {
+            Intent intent = new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS);
+            startActivityForResult(intent, 1);
+            return false;
         }
         return true;
     }
