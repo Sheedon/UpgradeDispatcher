@@ -184,7 +184,7 @@ public class DefaultWakeManager implements WakeManagerCenter {
         }
 
         ObservableSource[] sources = null;
-        if (ApkUtils.isAppInstalled(ShareConstants.WAKE_APP_PACKAGE, context)) {
+        if (!ApkUtils.isAppInstalled(ShareConstants.WAKE_APP_PACKAGE, context)) {
             sources = setUp(context);
         }
 
