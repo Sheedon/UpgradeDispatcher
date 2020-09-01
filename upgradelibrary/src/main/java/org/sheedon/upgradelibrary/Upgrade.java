@@ -15,6 +15,7 @@ import org.sheedon.upgradelibrary.manager.WakeManagerCenter;
 import org.sheedon.upgradelibrary.model.NetVersionModel;
 import org.sheedon.upgradelibrary.model.UpgradeVersionModel;
 import org.sheedon.upgradelibrary.other.UpgradeTask;
+import org.sheedon.upgradelibrary.shareUtils.ApkUtils;
 import org.sheedon.upgradelibrary.shareUtils.ShareConstants;
 import org.sheedon.upgradelibrary.shareUtils.StatusUtils;
 import org.sheedon.upgradelibrary.shareUtils.Version;
