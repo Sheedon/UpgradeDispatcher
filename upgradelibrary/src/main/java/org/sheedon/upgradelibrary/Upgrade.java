@@ -1,9 +1,10 @@
 package org.sheedon.upgradelibrary;
 
-import android.app.Application;
 import android.content.Context;
 import android.util.Log;
 
+import org.sheedon.upgradelibrary.handler.HandleCenter;
+import org.sheedon.upgradelibrary.handler.HandleDispatcher;
 import org.sheedon.upgradelibrary.listener.InstallListener;
 import org.sheedon.upgradelibrary.listener.UpgradeListener;
 import org.sheedon.upgradelibrary.manager.DefaultDownloadManager;
@@ -12,25 +13,16 @@ import org.sheedon.upgradelibrary.manager.DefaultWakeManager;
 import org.sheedon.upgradelibrary.manager.DownloadManagerCenter;
 import org.sheedon.upgradelibrary.manager.InstallManagerCenter;
 import org.sheedon.upgradelibrary.manager.WakeManagerCenter;
-import org.sheedon.upgradelibrary.model.NetVersionModel;
 import org.sheedon.upgradelibrary.model.UpgradeVersionModel;
 import org.sheedon.upgradelibrary.other.UpgradeTask;
-import org.sheedon.upgradelibrary.shareUtils.ApkUtils;
 import org.sheedon.upgradelibrary.shareUtils.ShareConstants;
 import org.sheedon.upgradelibrary.shareUtils.StatusUtils;
 import org.sheedon.upgradelibrary.shareUtils.Version;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 
-import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.annotations.NonNull;
-import io.reactivex.rxjava3.core.Observable;
-import io.reactivex.rxjava3.core.ObservableSource;
 import io.reactivex.rxjava3.core.Observer;
 import io.reactivex.rxjava3.disposables.Disposable;
-import io.reactivex.rxjava3.schedulers.Schedulers;
 
 /**
  * App升级核心单例类
@@ -42,7 +34,7 @@ import io.reactivex.rxjava3.schedulers.Schedulers;
 public class Upgrade {
     private static final String TAG = "Upgrade.Upgrade";
 
-    private static Upgrade sInstance;
+    private static volatile Upgrade sInstance;
     private static boolean sInstalled = false;
 
     final Context context;
@@ -58,6 +50,8 @@ public class Upgrade {
 
     private UpgradeListener upgradeListener;
 
+    private HandleCenter handleDispatcher;
+
 
     public Upgrade(Context context, int status,
                    WakeManagerCenter wakeManager, DownloadManagerCenter downloadManager,
@@ -68,6 +62,9 @@ public class Upgrade {
         this.downloadManager = downloadManager;
         this.installManager = installManager;
         this.listener = listener;
+        sInstance = this;
+
+        handleDispatcher = new HandleDispatcher();
     }
 
     private Observer createObserver() {
@@ -154,29 +151,7 @@ public class Upgrade {
             listener.onResultCallback(UpgradeVersionModel.build(context));
         }
 
-        ObservableSource<Integer>[] wakeSources = wakeManager.setUp(context);
-        if (wakeSources == null)
-            return;
-
-        ObservableSource<Integer>[] downloadSources = downloadManager.setUp(context);
-        if (downloadSources == null)
-            return;
-
-        ObservableSource<Integer>[] installSources = installManager.setUp(context);
-        if (installSources == null)
-            return;
-
-        List<ObservableSource<Integer>> sources = new ArrayList<>();
-        sources.addAll(Arrays.asList(wakeSources));
-        sources.addAll(Arrays.asList(downloadSources));
-        sources.addAll(Arrays.asList(installSources));
-
-
-        Observable.merge(sources)
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribeOn(Schedulers.io())
-                .subscribe(createObserver());
-
+        handleDispatcher.initConfig(context, wakeManager, downloadManager, installManager, createObserver());
     }
 
 
@@ -192,30 +167,8 @@ public class Upgrade {
      */
     public void onUpgradeReceived(UpgradeTask model, UpgradeListener listener) {
         this.upgradeListener = listener;
-        ObservableSource<Integer>[] wakeSources = wakeManager.upgradeDispatch(context);
-        if (wakeSources == null) {
-            return;
-        }
 
-        ObservableSource<Integer>[] downloadSources = downloadManager.upgradeDispatch(context, model);
-        if (downloadSources == null) {
-            return;
-        }
-
-        ObservableSource<Integer>[] installSources = installManager.upgradeDispatch(context, model);
-        if (installSources == null) {
-            return;
-        }
-
-        List<ObservableSource<Integer>> sources = new ArrayList<>();
-        sources.addAll(Arrays.asList(wakeSources));
-        sources.addAll(Arrays.asList(downloadSources));
-        sources.addAll(Arrays.asList(installSources));
-
-        Observable.merge(sources)
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribeOn(Schedulers.io())
-                .subscribe(createObserver());
+        handleDispatcher.upgrade(context, model, createObserver());
     }
 
     /**
@@ -241,7 +194,7 @@ public class Upgrade {
 
     public void cancel() {
 
-        if(upgradeListener != null){
+        if (upgradeListener != null) {
             upgradeListener.onUpgradeStatus(ShareConstants.STATUS_UPGRADE_CANCEL);
         }
 

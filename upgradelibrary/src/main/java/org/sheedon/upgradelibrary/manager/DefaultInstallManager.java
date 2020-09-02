@@ -55,6 +55,11 @@ public class DefaultInstallManager implements InstallManagerCenter {
         return new ObservableSource[]{createWaitNoticeToReceived(context), installApk(context, model)};
     }
 
+    @Override
+    public ObservableSource<Integer>[] installDispatch(Context context, UpgradeTask model) {
+        return new ObservableSource[]{installApk(context, model)};
+    }
+
     // 1.调查通知测试，广播传输，获取是否启动
     private ObservableSource<Integer> createWaitNoticeToReceived(final Context context) {
         return Observable.create(new ObservableOnSubscribe<Integer>() {

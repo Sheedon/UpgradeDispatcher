@@ -21,6 +21,9 @@ public interface InstallManagerCenter {
     // 升级调度
     ObservableSource<Integer>[] upgradeDispatch(Context context, UpgradeTask model);
 
+    // 安装
+    ObservableSource<Integer>[] installDispatch(Context context, UpgradeTask model);
+
     // 通知已接收需要更新的Apk包名【唤醒App】
     void noticeWakeReceived();
 }
