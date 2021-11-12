@@ -1,7 +1,7 @@
-# UpgradeDispatcher
+# UpgradeDispatcher 
 
 UpgradeDispatcher is a update app library for Android
-
+为IOT版本
 
 
 
