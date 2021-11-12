@@ -3,243 +3,247 @@ package org.sheedon.upgradelibrary.manager;
 import android.content.Context;
 import android.content.pm.PackageInfo;
 
+import com.hjq.permissions.OnPermissionCallback;
+import com.hjq.permissions.Permission;
+import com.hjq.permissions.XXPermissions;
 import com.liulishuo.okdownload.DownloadTask;
 
-import org.sheedon.upgradelibrary.other.DownloadHandle;
-import org.sheedon.upgradelibrary.other.DownloadListener;
-import org.sheedon.upgradelibrary.other.UpgradeTask;
-import org.sheedon.upgradelibrary.shareUtils.ApkUtils;
-import org.sheedon.upgradelibrary.shareUtils.ShareConstants;
-import org.sheedon.upgradelibrary.shareUtils.UpgradeStatusException;
-import org.sheedon.upgradelibrary.shareUtils.Version;
+import org.sheedon.upgradelibrary.R;
+import org.sheedon.upgradelibrary.UpgradeConstants;
+import org.sheedon.upgradelibrary.download.DownloadHandler;
+import org.sheedon.upgradelibrary.download.DownloadListener;
+import org.sheedon.upgradelibrary.download.UpgradeTask;
+import org.sheedon.upgradelibrary.listener.DispatchListener;
+import org.sheedon.upgradelibrary.listener.UpgradeListener;
+import org.sheedon.upgradelibrary.utils.ApkUtils;
 
 import java.io.File;
-
-import io.reactivex.rxjava3.annotations.NonNull;
-import io.reactivex.rxjava3.core.Observable;
-import io.reactivex.rxjava3.core.ObservableEmitter;
-import io.reactivex.rxjava3.core.ObservableOnSubscribe;
-import io.reactivex.rxjava3.core.ObservableSource;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * 下载管理类
- * 初始化操作：
- * 1.创建默认apk下载地址父级目录
- * 2.核实当前版本和更新版本，文件夹下apk版本内容，删除无用apk包。
- * <p>
- * 更新操作
- * 1.核实本地下载路径，核实更新数据集
- * 2.下载apk
- * 3.通知下载进度（开始下载，下载量，下载失败，下载完成，重试次数）
- * 4.下载完成，通知下载流程结束
+ * 默认下载管理者
  *
  * @Author: sheedon
  * @Email: sheedonsun@163.com
- * @Date: 2020/6/13 23:32
+ * @Date: 2021/10/25 11:34 上午
  */
-public class DefaultDownloadManager implements DownloadManagerCenter, DownloadListener {
+public final class DefaultDownloadManager implements DownloadManagerCenter
+        , OnPermissionCallback {
 
-    private boolean setUpping = false;
-    private File downloadFolder;
+    // 执行监听器
+    private DispatchListener listener;
+    // 上下文
+    private final Context context;
+    // 权限
+    private static final String[] PERMISSIONS = new String[]{Permission.REQUEST_INSTALL_PACKAGES,
+            Permission.NOTIFICATION_SERVICE, Permission.MANAGE_EXTERNAL_STORAGE};
 
-    private int upgradeVersion = 0;
-    private int currentVersion = 0;
+    // 是否运行中
+    private boolean running;
 
-    private DownloadHandle downloadHandle;
+    private final UpgradeTask.Builder taskBuilder;
 
-    private boolean running = false;
+    private final AtomicBoolean cancel = new AtomicBoolean(false);
+    // 下载执行器
+    private DownloadHandler handler;
 
-    private static final Object lock = new Object();
-    private ObservableEmitter<Integer> downloadEmitter;
+    public DefaultDownloadManager(Context context) {
+        this.context = context;
+        taskBuilder = new UpgradeTask.Builder();
+    }
+
 
     @Override
-    public ObservableSource<Integer>[] setUp(Context context) {
-        upgradeVersion = Version.getUpgradeVersion(context);
-        currentVersion = ApkUtils.getVersionCode(context);
-
-        if (setUpping)
-            return null;
-
-        return new ObservableSource[]{createParentFile(context)};
+    public boolean isRunning() {
+        return running;
     }
 
-    // 创建默认apk下载地址父级目录
-    // 核实当前版本和更新版本，文件夹下apk版本内容，删除无用apk包。
-    private ObservableSource<Integer> createParentFile(final Context context) {
-        return Observable.create(new ObservableOnSubscribe<Integer>() {
-            @Override
-            public void subscribe(@NonNull ObservableEmitter<Integer> emitter) {
-                if (setUpping)
-                    return;
+    /**
+     * 附加升级监听器
+     *
+     * @param listener 监听器
+     */
+    @Override
+    public void attachListener(DispatchListener listener) {
+        this.listener = listener;
+    }
 
-                setUpping = true;
+    /**
+     * 核实升级安装权限
+     * 1。安装权限
+     * 2。通知栏权限
+     * 3。存储权限
+     */
+    @Override
+    public void checkPermission(Context context) {
+        running = true;
+        XXPermissions.with(context)
+                // 申请权限
+                .permission(PERMISSIONS)
+                .request(this);
+    }
 
+    /**
+     * 核实本地apk是否符合安装条件，
+     * 若存在直接安装，
+     * 否则下载操作
+     *
+     * @return 是否需要下载
+     */
+    @Override
+    public boolean checkLocalApk(String netName) {
+        // 根据包名获取，当前包所放在的下载路径
+        String lastName = ApkUtils.getPackageLastName(context);
+        String downloadFile = UpgradeConstants.UPDATE_APP_PATH + lastName;
 
-                if (downloadFolder == null) {
-                    downloadFolder = new File(ShareConstants.UPDATE_APP_PATH);
-                }
+        // 构建生成路径
+        File parentFile = new File(downloadFile);
+        if (!parentFile.exists()) {
+            //noinspection ResultOfMethodCallIgnored
+            parentFile.mkdirs();
+        }
 
-                if (!downloadFolder.exists()) {
-                    downloadFolder.mkdirs();
-                }
+        // 填充父级路径和下载的文件名（版本名）
+        taskBuilder.dirFile(parentFile)
+                .downloadFileName(netName);
 
-                if (downloadFolder == null) {
-                    sendError(emitter, ShareConstants.STATUS_INIT_FILE_CREATION_FAILED);
-                    return;
-                }
+        File[] files = parentFile.listFiles();
+        // 没有文件，则需要下载
+        if (files == null || files.length == 0) {
+            return true;
+        }
 
+        // 是否存在目标文件
+        boolean hasTargetFile = false;
 
-                File[] files = downloadFolder.listFiles();
-
-                if (files == null) {
-                    setUpping = false;
-                    sendNext(emitter, ShareConstants.STATUS_INIT_DOWNLOAD_COMPLETE);
-                    return;
-                }
-
-                for (File file : files) {
-                    clearFile(context, file);
-                }
-                sendNext(emitter, ShareConstants.STATUS_INIT_DOWNLOAD_COMPLETE);
-                setUpping = false;
+        // 遍历删除
+        for (File file : files) {
+            if (file == null) {
+                continue;
             }
-        });
-    }
 
-
-    // 清理apk文件
-    private void clearFile(Context context, File file) {
-        if (file.getName().endsWith(".apk")) {
-            PackageInfo apkPackageInfo = ApkUtils.getApkPackageInfo(context, file);
-            if (apkPackageInfo == null)
-                return;
-
-            if (apkPackageInfo.versionCode <= currentVersion) {
+            boolean apkFile = ApkUtils.isApkFile(file, netName);
+            if (!apkFile) {
+                //noinspection ResultOfMethodCallIgnored
                 file.delete();
             }
+
+            PackageInfo info = ApkUtils.getApkPackageInfo(context, file);
+            if (info != null) {
+                hasTargetFile = true;
+            }
+
         }
+
+        return hasTargetFile;
     }
 
+    /**
+     * 下载Apk
+     *
+     * @param netUrl 网络下载URL
+     */
     @Override
-    public ObservableSource<Integer>[] upgradeDispatch(Context context, UpgradeTask model) {
-        if (running) {
-            return null;
+    public void downloadApk(String netUrl) {
+        if (cancel.get()) {
+            return;
         }
 
-        return new ObservableSource[]{checkDownloadTask(model), downloadTask(model)};
-    }
-
-    // 核实本地下载路径，核实更新数据集
-    private ObservableSource<Integer> checkDownloadTask(final UpgradeTask model) {
-        return Observable.create(new ObservableOnSubscribe<Integer>() {
+        UpgradeTask task = taskBuilder.netUrl(netUrl).build();
+        handler = new DownloadHandler(task, new DownloadListener() {
             @Override
-            public void subscribe(@NonNull ObservableEmitter<Integer> emitter) {
-                if (running)
-                    return;
+            public void start(DownloadTask task) {
+                if(listener != null){
+                    listener.onStartTask();
+                }
+            }
 
-                running = true;
-
-                if (model == null || model.getNetVersionModel() == null) {
-                    sendError(emitter,ShareConstants.STATUS_UPGRADE_PARAMETER_ERROR);
+            @Override
+            public void progress(int progress) {
+                if (listener == null) {
                     return;
                 }
 
-                upgradeVersion = model.getNetVersionModel().getVersion();
-                if (upgradeVersion <= currentVersion) {
-                    sendError(emitter,ShareConstants.STATUS_UPGRADE_GREATER_THAN_CURRENT_VERSION);
+                listener.onProgress(progress);
+            }
+
+            @Override
+            public void completed() {
+                running = false;
+                if (listener == null) {
                     return;
                 }
 
-                String path = model.getNetVersionModel().getPath();
-                if (path == null || path.isEmpty()) {
-                    sendError(emitter,ShareConstants.STATUS_UPGRADE_PARAMETER_ERROR);
-                    return;
-                }
+                listener.onDownloadCompleted(new File(task.getParentFile(), task.getFileName()));
+            }
 
-                downloadHandle = new DownloadHandle(model.getReCount());
-
+            @Override
+            public void error(String message) {
+                notifyUpgradeFailure(UpgradeListener.TYPE_DOWNLOAD_FAILURE,
+                        message);
             }
         });
+        handler.downloadTask();
+
     }
 
-    // 下载任务
-    private ObservableSource<Integer> downloadTask(final UpgradeTask task) {
-        return Observable.create(new ObservableOnSubscribe<Integer>() {
-            @Override
-            public void subscribe(@NonNull ObservableEmitter<Integer> emitter) {
-                if (!running)
-                    return;
+    /**
+     * 取消
+     */
+    @Override
+    public void cancel() {
+        cancel.set(true);
+        if (handler != null) {
+            handler.cancel();
+        }
+    }
 
-                downloadEmitter = emitter;
-                synchronized (lock) {
-                    try {
-                        downloadHandle.downloadTask(task.getNetVersionModel().getPath(),
-                                task.getParentFile(),
-                                task.getFileName(), DefaultDownloadManager.this);
 
-                        lock.wait();
-                    } catch (InterruptedException ignored) {
-                        sendError(emitter,ShareConstants.STATUS_UPGRADE_DOWNLOAD_FAIL);
-                    } finally {
-                        running = false;
-                        downloadEmitter = null;
-                    }
-                }
-
+    /**
+     * 授予权限
+     *
+     * @param permissions 权限内容
+     * @param all         是否所有
+     */
+    @Override
+    public void onGranted(List<String> permissions, boolean all) {
+        if (all) {
+            if (listener == null) {
+                return;
             }
-        });
+
+            listener.doNext();
+        } else {
+            notifyUpgradeFailure(UpgradeListener.TYPE_PERMISSION,
+                    context.getString(R.string.app_permission));
+        }
     }
 
+    /**
+     * 权限被拒绝
+     *
+     * @param permissions 权限内容
+     * @param never       是否永久拒绝
+     */
     @Override
-    public void start(DownloadTask task) {
-        if (downloadEmitter != null) {
-            downloadEmitter.onNext(ShareConstants.STATUS_UPGRADE_DOWNLOAD_START);
-        }
+    public void onDenied(List<String> permissions, boolean never) {
+        notifyUpgradeFailure(UpgradeListener.TYPE_PERMISSION,
+                context.getString(R.string.app_permission));
     }
 
-    @Override
-    public void progress(int progress) {
-        if (downloadEmitter != null) {
-            downloadEmitter.onNext(progress);
+    /**
+     * 通知升级结果
+     *
+     * @param code    错误编码
+     * @param message 描述信息
+     */
+    private void notifyUpgradeFailure(int code, String message) {
+        running = false;
+        if (listener == null) {
+            return;
         }
+
+        listener.onUpgradeFailure(code, message);
     }
-
-    @Override
-    public void completed() {
-        if (downloadEmitter != null) {
-            downloadEmitter.onNext(ShareConstants.STATUS_UPGRADE_DOWNLOAD_COMPLETE);
-        }
-
-        synchronized (lock) {
-            lock.notifyAll();
-        }
-
-        if (downloadHandle != null) {
-            downloadHandle.destroy();
-        }
-        downloadHandle = null;
-    }
-
-    @Override
-    public void error(String message) {
-        if (downloadEmitter != null) {
-            downloadEmitter.onError(new UpgradeStatusException(message));
-        }
-
-        synchronized (lock) {
-            lock.notifyAll();
-        }
-    }
-
-
-    private void sendNext(ObservableEmitter<Integer> emitter, int status) {
-        if (!emitter.isDisposed())
-            emitter.onNext(status);
-    }
-
-    private void sendError(ObservableEmitter<Integer> emitter, int status) {
-        if (!emitter.isDisposed())
-            emitter.onError(new UpgradeStatusException(status));
-    }
-
 }

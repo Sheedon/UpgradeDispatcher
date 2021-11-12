@@ -1,100 +1,38 @@
 package org.sheedon.upgradedispatcher;
 
-import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
-import android.app.AppOpsManager;
-import android.content.Context;
-import android.content.Intent;
 import android.os.Bundle;
-import android.provider.Settings;
-import android.util.Log;
 import android.view.View;
 
 import org.sheedon.upgradelibrary.UpgradeInstaller;
-import org.sheedon.upgradelibrary.listener.InstallListener;
-import org.sheedon.upgradelibrary.listener.UpgradeListener;
-import org.sheedon.upgradelibrary.model.UpgradeVersionModel;
-import org.sheedon.upgradelibrary.other.UpgradeTask;
-import org.sheedon.upgradelibrary.model.NetVersionModel;
+import org.sheedon.upgradelibrary.model.UpgradeTaskModel;
+import org.sheedon.upgradelibrary.view.UpdateDialogFragment;
+
 
 public class MainActivity extends AppCompatActivity {
 
-    private UpgradeTask task;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        checkUsagePermission();
-        init();
     }
 
-    private void init() {
-        UpgradeInstaller.setUp(App.getInstance(), new InstallListener() {
-            @Override
-            public void onResultCallback(UpgradeVersionModel model) {
+    int versionCode = 13;
+    String versionName = "v1.0";
+    String apkPath = "http://file.yanhangtec.com/prodectfile/fileResource/upload/a94bd57b-fdb1-4432-8776-293dd04e48d0.apk";
+    String desc = "1，添加删除信用卡接口。\r\n2，添加vip认证。\r\n3，区分自定义消费，一个小时不限制。\r\n4，添加放弃任务接口，小时内不生成。\r\n5，消费任务手动生成。";
 
-            }
-        });
-    }
 
     public void onClick(View view) {
-//        manager.setUpTask(task, new UpgradeListener() {
-//        });
-//        ApkUtils.sendBroadcast(this,"com.test.test");
-//
-//        PluginManager.getInstance().installPlugin();
-        task = new UpgradeTask.Builder(this, NetVersionModel.build(2, "https://yanhang-file.oss-cn-hangzhou.aliyuncs.com/apk/%E6%9B%B4%E6%96%B0demo.apk"))
-                .build();
-        UpgradeInstaller.onReceiveUpgradeInfo(this, task, new UpgradeListener() {
-            @Override
-            public void onProgress(int progress) {
-                Log.v("UpgradeListener", "progress:" + progress);
-            }
-
-            @Override
-            public void onUpgradeError(String message) {
-                Log.v("UpgradeListener", "message:" + message);
-            }
-
-            @Override
-            public void onUpgradeStatus(int status) {
-                Log.v("UpgradeListener", "status:" + status);
-            }
-        });
+        UpgradeTaskModel model = new UpgradeTaskModel.Builder(versionCode, versionName, apkPath)
+                .description(desc).build();
+        UpdateDialogFragment.newInstance(model).show(this.getSupportFragmentManager(), "dialog");
 
     }
 
-    public void onCancelClick(View view){
+    public void onCancelClick(View view) {
         UpgradeInstaller.cancel(this);
-    }
-
-    private boolean checkUsagePermission() {
-        AppOpsManager appOps = (AppOpsManager) getSystemService(Context.APP_OPS_SERVICE);
-        int mode = appOps.checkOpNoThrow("android:get_usage_stats", android.os.Process.myUid(), getPackageName());
-        boolean granted = mode == AppOpsManager.MODE_ALLOWED;
-        if (!granted) {
-            Intent intent = new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS);
-            startActivityForResult(intent, 1);
-            return false;
-        }
-        return true;
-    }
-
-    private static final int MY_PERMISSIONS_REQUEST_PACKAGE_USAGE_STATS = 1101;
-
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == MY_PERMISSIONS_REQUEST_PACKAGE_USAGE_STATS) {
-            if (!checkUsagePermission()) {
-                //若用户未开启权限，则引导用户开启“Apps with usage access”权限
-                startActivityForResult(
-                        new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS),
-                        MY_PERMISSIONS_REQUEST_PACKAGE_USAGE_STATS);
-            }
-        }
     }
 }

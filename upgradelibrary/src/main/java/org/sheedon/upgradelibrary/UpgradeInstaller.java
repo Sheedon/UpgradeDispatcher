@@ -1,51 +1,48 @@
 package org.sheedon.upgradelibrary;
 
-import android.app.Application;
 import android.content.Context;
 
-import org.sheedon.upgradelibrary.listener.InstallListener;
+import org.sheedon.upgradelibrary.listener.InitializeListener;
 import org.sheedon.upgradelibrary.listener.UpgradeListener;
-import org.sheedon.upgradelibrary.model.NetVersionModel;
-import org.sheedon.upgradelibrary.other.UpgradeTask;
 
 /**
  * 升级安装程序
  *
  * @Author: sheedon
  * @Email: sheedonsun@163.com
- * @Date: 2020/6/13 22:20
+ * @Date: 2021/10/25 10:05 上午
  */
 public class UpgradeInstaller {
     private static final String TAG = "Upgrade.UpgradeInstaller";
 
-    public static Upgrade setUp(Application application, InstallListener listener) {
-        Upgrade upgrade = new Upgrade.Builder(application).bindInstallListener(listener).build();
-        upgrade.setUp();
-        return upgrade;
+    public static Upgrade setUp(Context context, InitializeListener listener) {
+        return new Upgrade.Builder(context).initializeListener(listener).build();
     }
 
     /**
      * 安装的升级包
      *
-     * @param context
-     * @param model
+     * @param context     上下文
+     * @param versionName 版本名称
+     * @param apkUrl      apk 路径
+     * @param listener    更新监听器
      */
-    public static void onReceiveUpgradeInfo(Context context, UpgradeTask model, UpgradeListener listener) {
-        Upgrade.with(context).onUpgradeReceived(model, listener);
+    public static void upgradeApp(Context context, String versionName, String apkUrl, UpgradeListener listener) {
+        Upgrade.with(context).upgradeApp(context, versionName, apkUrl, listener);
     }
 
-    public static void noticeWakeOpened(Context context) {
-        if (Upgrade.isUpgradeInstalled())
-            Upgrade.with(context).noticeWakeOpened();
+    /**
+     * 安装的升级包
+     *
+     * @param context     上下文
+     * @param versionName 版本名称
+     * @param apkUrl      apk 路径
+     */
+    public static void upgradeApp(Context context, String versionName, String apkUrl) {
+        upgradeApp(context, versionName, apkUrl, null);
     }
 
     public static void cancel(Context context) {
-        if (Upgrade.isUpgradeInstalled())
-            Upgrade.with(context).cancel();
-    }
-
-    public static void noticeWakeReceived(Context context) {
-        if (Upgrade.isUpgradeInstalled())
-            Upgrade.with(context).noticeWakeReceived();
+        Upgrade.with(context).cancel();
     }
 }

@@ -1,4 +1,4 @@
-package org.sheedon.upgradedispatcher;
+package org.sheedon.upgradelibrary;
 
 import org.junit.Test;
 

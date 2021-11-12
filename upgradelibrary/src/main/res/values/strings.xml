@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_permission">请授予权限！</string>
+    <string name="app_install_failure">安装失败！</string>
+    <string name="app_update_app">更新App！</string>
+    <string name="app_update_hint">是否升级到%s版本？</string>
+    <string name="app_update_tips">请授权访问存储空间权限，否则App无法更新！</string>
+    <string name="several_feature_updates">若干功能更新</string>
+</resources>

@@ -1,4 +1,4 @@
-package org.sheedon.upgradedispatcher;
+package org.sheedon.upgradelibrary;
 
 import android.content.Context;
 
@@ -22,6 +22,6 @@ public class ExampleInstrumentedTest {
         // Context of the app under test.
         Context appContext = InstrumentationRegistry.getInstrumentation().getTargetContext();
 
-        assertEquals("org.sheedon.upgradedispatcher", appContext.getPackageName());
+        assertEquals("org.sheedon.upgradelibrary", appContext.getPackageName());
     }
 }

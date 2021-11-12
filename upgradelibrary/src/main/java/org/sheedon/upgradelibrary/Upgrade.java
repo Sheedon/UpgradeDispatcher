@@ -1,136 +1,59 @@
 package org.sheedon.upgradelibrary;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
-import android.util.Log;
 
-import org.sheedon.upgradelibrary.handler.HandleCenter;
-import org.sheedon.upgradelibrary.handler.HandleDispatcher;
-import org.sheedon.upgradelibrary.listener.InstallListener;
+import org.sheedon.upgradelibrary.listener.InitializeListener;
 import org.sheedon.upgradelibrary.listener.UpgradeListener;
 import org.sheedon.upgradelibrary.manager.DefaultDownloadManager;
-import org.sheedon.upgradelibrary.manager.DefaultInstallManager;
-import org.sheedon.upgradelibrary.manager.DefaultWakeManager;
+import org.sheedon.upgradelibrary.manager.DefaultInstallerManager;
+import org.sheedon.upgradelibrary.manager.DefaultNotifyManager;
 import org.sheedon.upgradelibrary.manager.DownloadManagerCenter;
-import org.sheedon.upgradelibrary.manager.InstallManagerCenter;
-import org.sheedon.upgradelibrary.manager.WakeManagerCenter;
-import org.sheedon.upgradelibrary.model.UpgradeVersionModel;
-import org.sheedon.upgradelibrary.other.UpgradeTask;
-import org.sheedon.upgradelibrary.shareUtils.ShareConstants;
-import org.sheedon.upgradelibrary.shareUtils.StatusUtils;
-import org.sheedon.upgradelibrary.shareUtils.Version;
-
-
-import io.reactivex.rxjava3.annotations.NonNull;
-import io.reactivex.rxjava3.core.Observer;
-import io.reactivex.rxjava3.disposables.Disposable;
+import org.sheedon.upgradelibrary.manager.InstallerManagerCenter;
 
 /**
  * App升级核心单例类
  *
  * @Author: sheedon
  * @Email: sheedonsun@163.com
- * @Date: 2020/6/13 22:16
+ * @Date: 2021/10/25 10:06 上午
  */
-public class Upgrade {
+public final class Upgrade {
     private static final String TAG = "Upgrade.Upgrade";
 
+    @SuppressLint("StaticFieldLeak")
     private static volatile Upgrade sInstance;
-    private static boolean sInstalled = false;
 
-    final Context context;
-    int status;
-    final WakeManagerCenter wakeManager;
-    final DownloadManagerCenter downloadManager;
-    final InstallManagerCenter installManager;
-    final InstallListener listener;
+    private Context context;
+    // 初始化监听器
+    private InitializeListener initializeListener;
+    // 下载模块
+    private DownloadManagerCenter downloadManagerCenter;
+    // 安装模块
+    private InstallerManagerCenter installerManagerCenter;
+    // 升级执行器
+    private UpgradeDispatcher upgradeDispatcher;
+    // 通知窗体工厂类
+    private UpgradeListener.UpgradeNotifyFactory notifyFactory;
 
-    private Observer<Integer> currentObserver;
-    private Disposable disposable;
-    private String msg;
-
-    private UpgradeListener upgradeListener;
-
-    private HandleCenter handleDispatcher;
-
-
-    public Upgrade(Context context, int status,
-                   WakeManagerCenter wakeManager, DownloadManagerCenter downloadManager,
-                   InstallManagerCenter installManager, InstallListener listener) {
-        this.context = context;
-        this.status = status;
-        this.wakeManager = wakeManager;
-        this.downloadManager = downloadManager;
-        this.installManager = installManager;
-        this.listener = listener;
+    private Upgrade(Builder builder) {
+        this.context = builder.context;
+        this.initializeListener = builder.initializeListener;
+        this.downloadManagerCenter = builder.downloadManagerCenter;
+        this.installerManagerCenter = builder.installerManagerCenter;
+        this.notifyFactory = builder.notifyFactory;
+        this.upgradeDispatcher = new UpgradeDispatcher(context,
+                downloadManagerCenter, installerManagerCenter);
         sInstance = this;
-
-        handleDispatcher = new HandleDispatcher();
-    }
-
-    private Observer createObserver() {
-        if (currentObserver == null) {
-            synchronized (Upgrade.class) {
-                if (currentObserver == null) {
-                    currentObserver = new Observer<Integer>() {
-                        @Override
-                        public void onSubscribe(@NonNull Disposable d) {
-                            disposable = d;
-                        }
-
-                        @Override
-                        public void onNext(Integer integer) {
-                            status = integer;
-                            Log.v("SXD", "" + integer);
-
-
-                            if (upgradeListener != null) {
-                                if (integer >= 0 && integer <= 100) {
-                                    upgradeListener.onProgress(integer);
-                                } else {
-                                    upgradeListener.onUpgradeStatus(integer);
-                                }
-                            }
-                        }
-
-                        @Override
-                        public void onError(@NonNull Throwable e) {
-                            try {
-                                String message = e.getMessage();
-                                if (message == null)
-                                    message = "";
-                                status = Integer.parseInt(message);
-                                if (upgradeListener != null)
-                                    upgradeListener.onUpgradeError(StatusUtils.convertStatus(status));
-                            } catch (NumberFormatException ignored) {
-                                status = ShareConstants.STATUS_NORMAL;
-                                msg = e.getMessage();
-                                if (upgradeListener != null)
-                                    upgradeListener.onUpgradeError(msg);
-                            }
-                            Log.v("SXD", "" + e.getMessage());
-                        }
-
-                        @Override
-                        public void onComplete() {
-
-                        }
-                    };
-                }
-            }
-        }
-        return currentObserver;
     }
 
     /**
      * 使用默认配置升级进行初始化
      *
-     * @param context 我们将使用Application
+     * @param context 这里会被转化为ApplicationContext
      * @return the Upgrade object
      */
     public static Upgrade with(Context context) {
-        if (!sInstalled) {
-            throw new RuntimeException("you must install upgrade before get upgrade sInstance");
-        }
         if (sInstance == null) {
             synchronized (Upgrade.class) {
                 if (sInstance == null) {
@@ -142,134 +65,128 @@ public class Upgrade {
     }
 
     /**
-     * 初始化
+     * 升级App
      */
-    public void setUp() {
-        sInstalled = true;
-
+    public void upgradeApp(Context context, String versionName, String apkUrl, UpgradeListener listener) {
+        if (listener == null) {
+            listener = notifyFactory.createWindow(context);
+        }
+        if (upgradeDispatcher != null) {
+            upgradeDispatcher.upgradeApp(context, versionName, apkUrl, listener);
+            return;
+        }
         if (listener != null) {
-            listener.onResultCallback(UpgradeVersionModel.build(context));
+            listener.onUpgradeFailure(UpgradeListener.TYPE_ERROR, "");
         }
 
-        handleDispatcher.initConfig(context, wakeManager, downloadManager, installManager, createObserver());
-    }
-
-
-    public static boolean isUpgradeInstalled() {
-        return sInstalled;
-    }
-
-
-    /**
-     * 升级
-     *
-     * @param model 网络更新任务model
-     */
-    public void onUpgradeReceived(UpgradeTask model, UpgradeListener listener) {
-        this.upgradeListener = listener;
-
-        handleDispatcher.upgrade(context, model, createObserver());
     }
 
     /**
-     * 通知已打开【唤醒App】
+     * 取消操作
      */
-    public void noticeWakeOpened() {
-        if (wakeManager != null) {
-            wakeManager.noticeWakeOpened();
-        }
-    }
-
-    /**
-     * 通知已接收需要更新的Apk包名【唤醒App】
-     */
-    public void noticeWakeReceived() {
-        if (wakeManager != null) {
-            wakeManager.noticeWakeReceived();
-        }
-        if (installManager != null) {
-            installManager.noticeWakeReceived();
-        }
-    }
-
     public void cancel() {
-
-        if (upgradeListener != null) {
-            upgradeListener.onUpgradeStatus(ShareConstants.STATUS_UPGRADE_CANCEL);
+        if (upgradeDispatcher != null) {
+            upgradeDispatcher.cancel();
         }
+    }
 
-        if (disposable != null && !disposable.isDisposed()) {
-            disposable.dispose();
-        }
+    /**
+     * 销毁
+     */
+    public void destroy() {
+        context = null;
+        initializeListener = null;
+        downloadManagerCenter = null;
+        installerManagerCenter = null;
+        upgradeDispatcher = null;
+        sInstance = null;
     }
 
     public static class Builder {
 
         private final Context context;
-        private InstallListener listener;
-
-        private WakeManagerCenter wakeManager;
-        private DownloadManagerCenter downloadManager;
-        private InstallManagerCenter installManager;
-
-        private int status = -999;
+        // 初始化监听器
+        private InitializeListener initializeListener;
+        // 下载模块
+        private DownloadManagerCenter downloadManagerCenter;
+        // 安装模块
+        private InstallerManagerCenter installerManagerCenter;
+        // 通知窗体工厂类
+        private UpgradeListener.UpgradeNotifyFactory notifyFactory;
 
         public Builder(Context context) {
-            this.context = context;
+            this.context = context.getApplicationContext();
         }
 
-        public Builder wakeManager(WakeManagerCenter wakeManager) {
-            if (wakeManager == null) {
-                throw new RuntimeException("wakeManager must not be null.");
+        /**
+         * 初始化监听器
+         *
+         * @param listener 初始化监听器
+         * @return Builder
+         */
+        public Builder initializeListener(InitializeListener listener) {
+            if (listener == null) {
+                throw new RuntimeException("InitializeListener cannot null");
             }
-            this.wakeManager = wakeManager;
+            this.initializeListener = listener;
             return this;
         }
 
-        public Builder downloadManager(DownloadManagerCenter downloadManager) {
-            if (downloadManager == null) {
-                throw new RuntimeException("downloadManager must not be null.");
+        /**
+         * 下载管理中心
+         *
+         * @param center 下载管理中心
+         * @return Builder
+         */
+        public Builder downloadManagerCenter(DownloadManagerCenter center) {
+            if (center == null) {
+                throw new RuntimeException("DownloadManagerCenter cannot null");
             }
-            this.downloadManager = downloadManager;
+            this.downloadManagerCenter = center;
             return this;
         }
 
-        public Builder installManager(InstallManagerCenter installManager) {
-            if (installManager == null) {
-                throw new RuntimeException("installManager must not be null.");
+        /**
+         * 安装管理中心
+         *
+         * @param center 安装管理中心
+         * @return Builder
+         */
+        public Builder installerManagerCenter(InstallerManagerCenter center) {
+            if (center == null) {
+                throw new RuntimeException("InstallerManagerCenter cannot null");
             }
-            this.installManager = installManager;
+            this.installerManagerCenter = center;
             return this;
         }
 
-        public Builder bindInstallListener(InstallListener listener) {
-            this.listener = listener;
+        /**
+         * 通知展示的工厂创建类
+         *
+         * @param factory 工厂类
+         * @return Builder
+         */
+        public Builder notifyFactory(UpgradeListener.UpgradeNotifyFactory factory) {
+            if (factory == null) {
+                throw new RuntimeException("factory cannot null");
+            }
+            this.notifyFactory = factory;
             return this;
         }
-
 
         public Upgrade build() {
-            if (status == -999) {
-                status = ShareConstants.STATUS_NORMAL;
+            if (downloadManagerCenter == null) {
+                downloadManagerCenter = new DefaultDownloadManager(context);
             }
 
-            if (wakeManager == null) {
-                wakeManager = new DefaultWakeManager();
+            if (installerManagerCenter == null) {
+                installerManagerCenter = new DefaultInstallerManager(context);
             }
 
-            if (downloadManager == null) {
-                downloadManager = new DefaultDownloadManager();
+            if (notifyFactory == null) {
+                notifyFactory = new DefaultNotifyManager();
             }
-
-            if (installManager == null) {
-                installManager = new DefaultInstallManager();
-            }
-
-            Version.load(context);
-
-            return new Upgrade(context, status,
-                    wakeManager, downloadManager, installManager,
-                    listener);
+            return new Upgrade(this);
         }
     }
 }
