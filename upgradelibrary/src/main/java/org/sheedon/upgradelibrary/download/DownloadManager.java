@@ -1,5 +1,8 @@
 package org.sheedon.upgradelibrary.download;
 
+import android.os.Handler;
+import android.os.Message;
+
 import androidx.annotation.NonNull;
 
 import com.liulishuo.okdownload.DownloadTask;
@@ -7,6 +10,8 @@ import com.liulishuo.okdownload.core.cause.ResumeFailedCause;
 import com.liulishuo.okdownload.core.listener.DownloadListener3;
 
 import java.io.File;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 下载管理器
@@ -60,6 +65,10 @@ class DownloadManager {
 
         private final DownloadListener listener;
 
+        // false:未完成，true：等待中，两次false，已完成
+        private final AtomicBoolean flag = new AtomicBoolean();
+        private final Handler handler = new Handler();
+
         SingleDownloadListener(DownloadListener listener) {
             this.listener = listener;
         }
@@ -86,6 +95,11 @@ class DownloadManager {
             if (listener != null) {
                 long progress = currentOffset * 100 / totalLength;
                 listener.progress((int) progress);
+
+                if (progress >= 100 && !flag.get()) {
+                    flag.set(true);
+                    handler.postDelayed(runnable, 50);
+                }
             }
         }
 
@@ -116,5 +130,23 @@ class DownloadManager {
             }
         }
 
+        private final Runnable runnable = new Runnable() {
+            @Override
+            public void run() {
+                if (flag.get()) {
+                    flag.set(false);
+                    handler.postDelayed(runnable, 100);
+                    return;
+                }
+
+                if (!flag.get()) {
+                    if (listener != null) {
+                        listener.completed();
+                    }
+                }
+            }
+        };
+
     }
+
 }
