@@ -1,7 +1,6 @@
 package org.sheedon.upgradelibrary.download;
 
 import android.os.Handler;
-import android.os.Message;
 
 import androidx.annotation.NonNull;
 
@@ -9,9 +8,10 @@ import com.liulishuo.okdownload.DownloadTask;
 import com.liulishuo.okdownload.core.cause.ResumeFailedCause;
 import com.liulishuo.okdownload.core.listener.DownloadListener3;
 
-import java.io.File;
+import org.sheedon.upgradelibrary.model.UpgradeTask;
+
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 下载管理器
@@ -40,14 +40,20 @@ class DownloadManager {
 
     }
 
-    public void downloadSingleTask(String url, File parentFile, String fileName, DownloadListener listener) {
+    public void downloadSingleTask(UpgradeTask upgradeTask, DownloadListener listener) {
 
-        task = new DownloadTask.Builder(url, parentFile)
-                .setFilename(fileName)
+        DownloadTask.Builder builder = new DownloadTask.Builder(upgradeTask.getNetUrl(), upgradeTask.getParentFile())
+                .setFilename(upgradeTask.getFileName())
                 .setMinIntervalMillisCallbackProcess(30)
-                .setPassIfAlreadyCompleted(true)
-                .build();
+                .setPassIfAlreadyCompleted(true);
 
+
+        Map<String, String> handlers = upgradeTask.getHeaders();
+        for (Map.Entry<String, String> entry : handlers.entrySet()) {
+            builder.addHeader(entry.getKey(), entry.getValue());
+        }
+
+        task = builder.build();
         task.enqueue(new SingleDownloadListener(listener));
     }
 
@@ -93,6 +99,9 @@ class DownloadManager {
         @Override
         public void progress(@NonNull DownloadTask task, long currentOffset, long totalLength) {
             if (listener != null) {
+                if (totalLength == 0) {
+                    totalLength = (currentOffset + 1) * 100;
+                }
                 long progress = currentOffset * 100 / totalLength;
                 listener.progress((int) progress);
 

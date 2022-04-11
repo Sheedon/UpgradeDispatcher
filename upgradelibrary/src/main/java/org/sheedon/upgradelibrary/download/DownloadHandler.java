@@ -2,6 +2,8 @@ package org.sheedon.upgradelibrary.download;
 
 import com.liulishuo.okdownload.DownloadTask;
 
+import org.sheedon.upgradelibrary.model.UpgradeTask;
+
 /**
  * 下载执行者
  *
@@ -35,7 +37,7 @@ public class DownloadHandler implements DownloadListener {
      */
     public void downloadTask() {
         index++;
-        manager.downloadSingleTask(task.getNetUrl(), task.getParentFile(), task.getFileName(), this);
+        manager.downloadSingleTask(task, this);
     }
 
     @Override

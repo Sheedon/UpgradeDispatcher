@@ -10,6 +10,7 @@ import org.sheedon.upgradelibrary.manager.DefaultInstallerManager;
 import org.sheedon.upgradelibrary.manager.DefaultNotifyManager;
 import org.sheedon.upgradelibrary.manager.DownloadManagerCenter;
 import org.sheedon.upgradelibrary.manager.InstallerManagerCenter;
+import org.sheedon.upgradelibrary.model.UpgradeTask;
 
 /**
  * App升级核心单例类
@@ -67,12 +68,12 @@ public final class Upgrade {
     /**
      * 升级App
      */
-    public void upgradeApp(Context context, String versionName, String apkUrl, UpgradeListener listener) {
+    public void upgradeApp(Context context, UpgradeTask model, UpgradeListener listener) {
         if (listener == null) {
             listener = notifyFactory.createWindow(context);
         }
         if (upgradeDispatcher != null) {
-            upgradeDispatcher.upgradeApp(context, versionName, apkUrl, listener);
+            upgradeDispatcher.upgradeApp(context, model, listener);
             return;
         }
         if (listener != null) {

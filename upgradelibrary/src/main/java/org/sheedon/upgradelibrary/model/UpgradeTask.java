@@ -1,8 +1,11 @@
-package org.sheedon.upgradelibrary.download;
+package org.sheedon.upgradelibrary.model;
 
 import org.sheedon.upgradelibrary.UpgradeConstants;
 
 import java.io.File;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 
 /**
  * 更新任务
@@ -19,12 +22,14 @@ public class UpgradeTask {
     private final String netUrl;
     private final String fileName;
     private final int reCount;
+    private final Map<String, String> headers;
 
-    private UpgradeTask(String netUrl, File dirFile, String fileName, int reCount) {
-        this.netUrl = netUrl;
-        this.parentFile = dirFile;
-        this.fileName = convertFileName(fileName);
-        this.reCount = reCount;
+    private UpgradeTask(Builder builder) {
+        this.netUrl = builder.netUrl;
+        this.parentFile = builder.dirFile;
+        this.fileName = convertFileName(builder.fileName);
+        this.reCount = builder.reCount;
+        this.headers = builder.headers;
     }
 
     /**
@@ -56,6 +61,10 @@ public class UpgradeTask {
         return fileName;
     }
 
+    public Map<String, String> getHeaders() {
+        return headers;
+    }
+
     public int getReCount() {
         return reCount;
     }
@@ -68,6 +77,8 @@ public class UpgradeTask {
         File dirFile;
         // 文件名
         String fileName;
+        // 请求头部
+        Map<String, String> headers = new HashMap<>();
 
         int reCount;
 
@@ -78,9 +89,17 @@ public class UpgradeTask {
         /**
          * 网络地址
          *
-         * @param netUrl 网络地址
+         * @param apkUrl 网络地址
          * @return Builder
          */
+        public Builder apkUrl(String apkUrl) {
+            if (apkUrl == null || apkUrl.isEmpty()) {
+                throw new RuntimeException("apkUrl cannot null");
+            }
+            this.netUrl = apkUrl;
+            return this;
+        }
+
         public Builder netUrl(String netUrl) {
             if (netUrl == null || netUrl.isEmpty()) {
                 throw new RuntimeException("netUrl cannot null");
@@ -94,6 +113,14 @@ public class UpgradeTask {
                 throw new RuntimeException("dirFile cannot null");
             }
             this.dirFile = dirFile;
+            return this;
+        }
+
+        /**
+         * 版本号，充当文件名
+         */
+        public Builder versionName(String versionName) {
+            this.fileName = Objects.requireNonNull(versionName, "versionName == null");
             return this;
         }
 
@@ -119,9 +146,24 @@ public class UpgradeTask {
             return this;
         }
 
+        public Builder headers(Map<String, String> headers) {
+            this.headers = Objects.requireNonNull(headers, "headers == null");
+            return this;
+        }
+
+        public Builder addHeader(String key, String value) {
+            String targetKey = Objects.requireNonNull(key, "key == null");
+            String targetValue = Objects.requireNonNull(value, "value == null");
+            this.headers.put(targetKey, targetValue);
+            return this;
+        }
+
 
         public UpgradeTask build() {
-            return new UpgradeTask(netUrl, dirFile, fileName, reCount);
+            Objects.requireNonNull(netUrl, "netUrl == null");
+            Objects.requireNonNull(fileName, "fileName == null");
+
+            return new UpgradeTask(this);
         }
 
     }

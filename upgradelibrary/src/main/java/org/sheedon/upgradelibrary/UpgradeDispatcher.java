@@ -6,6 +6,7 @@ import org.sheedon.upgradelibrary.listener.DispatchListener;
 import org.sheedon.upgradelibrary.listener.UpgradeListener;
 import org.sheedon.upgradelibrary.manager.DownloadManagerCenter;
 import org.sheedon.upgradelibrary.manager.InstallerManagerCenter;
+import org.sheedon.upgradelibrary.model.UpgradeTask;
 
 import java.io.File;
 
@@ -31,9 +32,7 @@ class UpgradeDispatcher implements DispatchListener {
     private UpgradeListener listener;
 
     // 软件版本名称
-    private String versionName;
-    // apk 路径
-    private String apkUrl;
+    private UpgradeTask task;
 
 
     UpgradeDispatcher(Context context,
@@ -47,17 +46,15 @@ class UpgradeDispatcher implements DispatchListener {
     /**
      * 升级App
      *
-     * @param versionName 版本名称
-     * @param apkUrl      apk 路径
-     * @param listener    监听器
+     * @param model    下载信息
+     * @param listener 监听器
      */
-    void upgradeApp(Context context, String versionName, String apkUrl, UpgradeListener listener) {
+    void upgradeApp(Context context, UpgradeTask model, UpgradeListener listener) {
         if (downloader.isRunning()) {
             return;
         }
 
-        this.versionName = versionName;
-        this.apkUrl = apkUrl;
+        this.task = model;
         this.listener = listener;
 
         // 附加监听器
@@ -82,13 +79,14 @@ class UpgradeDispatcher implements DispatchListener {
      */
     @Override
     public void doNext() {
-        downloader.checkLocalApk(versionName);
-        downloader.downloadApk(apkUrl);
+        downloader.attachTask(task);
+        downloader.checkLocalApk();
+        downloader.downloadApk();
     }
 
     @Override
     public void onStartTask() {
-        if(listener != null){
+        if (listener != null) {
             listener.onStartDownload();
         }
     }
@@ -125,7 +123,7 @@ class UpgradeDispatcher implements DispatchListener {
      */
     @Override
     public void onDownloadCompleted(File downloadFile) {
-        if(listener != null){
+        if (listener != null) {
             listener.onDownloadSuccess();
         }
 

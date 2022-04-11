@@ -12,7 +12,7 @@ import org.sheedon.upgradelibrary.R;
 import org.sheedon.upgradelibrary.UpgradeConstants;
 import org.sheedon.upgradelibrary.download.DownloadHandler;
 import org.sheedon.upgradelibrary.download.DownloadListener;
-import org.sheedon.upgradelibrary.download.UpgradeTask;
+import org.sheedon.upgradelibrary.model.UpgradeTask;
 import org.sheedon.upgradelibrary.listener.DispatchListener;
 import org.sheedon.upgradelibrary.listener.UpgradeListener;
 import org.sheedon.upgradelibrary.utils.ApkUtils;
@@ -43,6 +43,7 @@ public final class DefaultDownloadManager implements DownloadManagerCenter
     private boolean running;
 
     private final UpgradeTask.Builder taskBuilder;
+    private UpgradeTask upgradeTask;
 
     private final AtomicBoolean cancel = new AtomicBoolean(false);
     // 下载执行器
@@ -84,6 +85,11 @@ public final class DefaultDownloadManager implements DownloadManagerCenter
                 .request(this);
     }
 
+    @Override
+    public void attachTask(UpgradeTask task) {
+        this.upgradeTask = task;
+    }
+
     /**
      * 核实本地apk是否符合安装条件，
      * 若存在直接安装，
@@ -92,13 +98,15 @@ public final class DefaultDownloadManager implements DownloadManagerCenter
      * @return 是否需要下载
      */
     @Override
-    public boolean checkLocalApk(String netName) {
+    public boolean checkLocalApk() {
         // 根据包名获取，当前包所放在的下载路径
         String lastName = ApkUtils.getPackageLastName(context);
         String downloadFile = UpgradeConstants.UPDATE_APP_PATH + lastName;
 
+        File taskParentFile = upgradeTask.getParentFile();
+
         // 构建生成路径
-        File parentFile = new File(downloadFile);
+        File parentFile = taskParentFile == null ? new File(downloadFile) : taskParentFile;
         if (!parentFile.exists()) {
             //noinspection ResultOfMethodCallIgnored
             parentFile.mkdirs();
@@ -106,7 +114,7 @@ public final class DefaultDownloadManager implements DownloadManagerCenter
 
         // 填充父级路径和下载的文件名（版本名）
         taskBuilder.dirFile(parentFile)
-                .downloadFileName(netName);
+                .downloadFileName(upgradeTask.getFileName());
 
         File[] files = parentFile.listFiles();
         // 没有文件，则需要下载
@@ -123,7 +131,7 @@ public final class DefaultDownloadManager implements DownloadManagerCenter
                 continue;
             }
 
-            boolean apkFile = ApkUtils.isApkFile(file, netName);
+            boolean apkFile = ApkUtils.isApkFile(file, upgradeTask.getNetUrl());
             if (!apkFile) {
                 //noinspection ResultOfMethodCallIgnored
                 file.delete();
@@ -141,20 +149,18 @@ public final class DefaultDownloadManager implements DownloadManagerCenter
 
     /**
      * 下载Apk
-     *
-     * @param netUrl 网络下载URL
      */
     @Override
-    public void downloadApk(String netUrl) {
+    public void downloadApk() {
         if (cancel.get()) {
             return;
         }
 
-        UpgradeTask task = taskBuilder.netUrl(netUrl).build();
+        UpgradeTask task = taskBuilder.netUrl(upgradeTask.getNetUrl()).headers(upgradeTask.getHeaders()).build();
         handler = new DownloadHandler(task, new DownloadListener() {
             @Override
             public void start(DownloadTask task) {
-                if(listener != null){
+                if (listener != null) {
                     listener.onStartTask();
                 }
             }
