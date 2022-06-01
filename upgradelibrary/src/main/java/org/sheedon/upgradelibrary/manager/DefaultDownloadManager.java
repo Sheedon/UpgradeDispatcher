@@ -156,7 +156,11 @@ public final class DefaultDownloadManager implements DownloadManagerCenter
             return;
         }
 
-        UpgradeTask task = taskBuilder.netUrl(upgradeTask.getNetUrl()).headers(upgradeTask.getHeaders()).build();
+        UpgradeTask task = taskBuilder
+                .netUrl(upgradeTask.getNetUrl())
+                .headers(upgradeTask.getHeaders())
+                .breakpoint(upgradeTask.isBreakpoint())
+                .build();
         handler = new DownloadHandler(task, new DownloadListener() {
             @Override
             public void start(DownloadTask task) {
