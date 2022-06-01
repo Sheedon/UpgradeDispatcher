@@ -46,6 +46,11 @@ public final class Upgrade {
         this.upgradeDispatcher = new UpgradeDispatcher(context,
                 downloadManagerCenter, installerManagerCenter);
         sInstance = this;
+
+
+        if (initializeListener != null) {
+            initializeListener.onCompleted();
+        }
     }
 
     /**

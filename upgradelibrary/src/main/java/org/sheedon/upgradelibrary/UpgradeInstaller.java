@@ -44,7 +44,7 @@ public class UpgradeInstaller {
      * @param apkUrl      apk 路径
      */
     public static void upgradeApp(Context context, String versionName, String apkUrl) {
-        upgradeApp(context, versionName, apkUrl,null);
+        upgradeApp(context, versionName, apkUrl, null);
     }
 
     /**

@@ -5,6 +5,7 @@ import android.os.Handler;
 import androidx.annotation.NonNull;
 
 import com.liulishuo.okdownload.DownloadTask;
+import com.liulishuo.okdownload.OkDownload;
 import com.liulishuo.okdownload.core.cause.ResumeFailedCause;
 import com.liulishuo.okdownload.core.listener.DownloadListener3;
 
@@ -54,6 +55,10 @@ class DownloadManager {
         }
 
         task = builder.build();
+        // 若不需要断点续传功能，则从breakpointStore中移除
+        if (!upgradeTask.isBreakpoint()) {
+            OkDownload.with().breakpointStore().remove(task.getId());
+        }
         task.enqueue(new SingleDownloadListener(listener));
     }
 

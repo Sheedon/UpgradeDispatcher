@@ -23,6 +23,7 @@ public class UpgradeTask {
     private final String fileName;
     private final int reCount;
     private final Map<String, String> headers;
+    private final boolean breakpoint;
 
     private UpgradeTask(Builder builder) {
         this.netUrl = builder.netUrl;
@@ -30,6 +31,7 @@ public class UpgradeTask {
         this.fileName = convertFileName(builder.fileName);
         this.reCount = builder.reCount;
         this.headers = builder.headers;
+        this.breakpoint = builder.breakpoint;
     }
 
     /**
@@ -69,6 +71,10 @@ public class UpgradeTask {
         return reCount;
     }
 
+    public boolean isBreakpoint() {
+        return breakpoint;
+    }
+
     public static class Builder {
 
         // 网络资源地址
@@ -81,6 +87,10 @@ public class UpgradeTask {
         Map<String, String> headers = new HashMap<>();
 
         int reCount;
+
+
+        // 是否启用断点重传机制
+        boolean breakpoint = true;
 
         public Builder() {
             reCount = 5;
@@ -155,6 +165,11 @@ public class UpgradeTask {
             String targetKey = Objects.requireNonNull(key, "key == null");
             String targetValue = Objects.requireNonNull(value, "value == null");
             this.headers.put(targetKey, targetValue);
+            return this;
+        }
+
+        public Builder breakpoint(boolean breakpoint) {
+            this.breakpoint = breakpoint;
             return this;
         }
 
