@@ -25,6 +25,7 @@ class DownloadManager {
     private static DownloadManager instance;
 
     private DownloadTask task;
+    private boolean breakpoint;
 
     public static DownloadManager getInstance() {
         if (instance == null) {
@@ -54,11 +55,9 @@ class DownloadManager {
             builder.addHeader(entry.getKey(), entry.getValue());
         }
 
+        breakpoint = upgradeTask.isBreakpoint();
+
         task = builder.build();
-        // 若不需要断点续传功能，则从breakpointStore中移除
-        if (!upgradeTask.isBreakpoint()) {
-            OkDownload.with().breakpointStore().remove(task.getId());
-        }
         task.enqueue(new SingleDownloadListener(listener));
     }
 
@@ -72,7 +71,7 @@ class DownloadManager {
 
 
     // 单一任务下载监听器
-    private static class SingleDownloadListener extends DownloadListener3 {
+    private class SingleDownloadListener extends DownloadListener3 {
 
         private final DownloadListener listener;
 
@@ -86,6 +85,9 @@ class DownloadManager {
 
         @Override
         protected void started(@NonNull DownloadTask task) {
+            if (!breakpoint) {
+                OkDownload.with().breakpointStore().get(task.getId());
+            }
             if (listener != null) {
                 listener.start(task);
             }
