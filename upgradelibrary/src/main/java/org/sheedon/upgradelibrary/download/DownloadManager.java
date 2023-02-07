@@ -85,9 +85,6 @@ class DownloadManager {
 
         @Override
         protected void started(@NonNull DownloadTask task) {
-            if (!breakpoint) {
-                OkDownload.with().breakpointStore().get(task.getId());
-            }
             if (listener != null) {
                 listener.start(task);
             }
